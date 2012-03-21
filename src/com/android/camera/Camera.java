@@ -1975,7 +1975,7 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
         if (!original.equals(optimalSize)) {
             mParameters.setPreviewSize(optimalSize.width, optimalSize.height);
 
-	    // If preview is running, stop preview and let startPreview call
+            // If preview is running, stop preview and let startPreview call
             // this function again because we cannot change size on the fly
             if (mCameraState != PREVIEW_STOPPED) {
                 stopPreview();
@@ -2075,8 +2075,9 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
         mParameters = mCameraDevice.getParameters();
 
         if ((updateSet & UPDATE_PARAM_INITIALIZE) != 0) {
-	    // Set camera mode
-	    CameraSettings.setVideoMode(mParameters, false);
+
+            // Set camera mode
+            CameraSettings.setVideoMode(mParameters, false);
 
             updateCameraParametersInitialize();
         }

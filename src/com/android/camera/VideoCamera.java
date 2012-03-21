@@ -1893,8 +1893,8 @@ public class VideoCamera extends ActivityBase
     private void setCameraParameters() {
         mParameters = mCameraDevice.getParameters();
 
-	// Set video mode
-	CameraSettings.setVideoMode(mParameters, true);
+        // Set video mode
+        CameraSettings.setVideoMode(mParameters, true);
 
         mParameters.setPreviewSize(mDesiredPreviewWidth, mDesiredPreviewHeight);
         mParameters.setPreviewFrameRate(mProfile.videoFrameRate);
