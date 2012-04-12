@@ -53,8 +53,8 @@ import android.os.Message;
 import android.os.MessageQueue;
 import android.os.SystemClock;
 import android.provider.MediaStore;
-import android.util.FloatMath;
 import android.util.Log;
+import android.util.FloatMath;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -99,6 +99,7 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
     private static final int SHOW_TAP_TO_FOCUS_TOAST = 6;
     private static final int UPDATE_THUMBNAIL = 7;
     private static final int FINISH_PINCH_TO_ZOOM = 8;
+    private static final int START_TOUCH_TO_FOCUS = 9;
 
     // The subset of parameters we need to update in setCameraParameters().
     private static final int UPDATE_PARAM_INITIALIZE = 1;
@@ -116,12 +117,15 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
     private static final int ZOOM_START = 1;
     private static final int ZOOM_STOPPING = 2;
 
+    private static final int TOUCH_TO_FOCUS_START_DELAY = 150; // milliseconds
+
     private int mZoomState = ZOOM_STOPPED;
     private boolean mSmoothZoomSupported = false;
     private int mZoomValue;  // The current zoom value.
     private int mZoomMax;
     private int mTargetZoomValue;
     private ZoomControl mZoomControl;
+    private boolean mVolumeZoom = false;    // Volume zoom.
 
     private boolean mStartZoom = false;
     private float oldDistance = 1f;
@@ -328,6 +332,13 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
                     mStartZoom = false;
                     break;
                 }
+
+                case START_TOUCH_TO_FOCUS: {
+                    if (msg.obj != null) {
+                        mFocusManager.onTouch((MotionEvent)(msg.obj));
+                    }
+                    break;
+                }
             }
         }
     }
@@ -366,9 +377,8 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
         mOrientationListener = new MyOrientationEventListener(Camera.this);
         mOrientationListener.enable();
 
-        // Initialize location sevice.
-        boolean recordLocation = RecordLocationPreference.get(
-                mPreferences, getContentResolver());
+        // Initialize location service.
+        boolean recordLocation = RecordLocationPreference.get(mPreferences, getContentResolver());
         initOnScreenIndicator();
         mLocationManager.recordLocation(recordLocation);
 
@@ -504,6 +514,9 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
         mZoomControl.setSmoothZoomSupported(mSmoothZoomSupported);
         mZoomControl.setOnZoomChangeListener(new ZoomChangeListener());
         mCameraDevice.setZoomChangeListener(mZoomListener);
+        
+        // Initialize volume zoom.
+        mVolumeZoom = VolumeZoomPreference.get(mPreferences, mContentResolver);
     }
 
     private void onZoomValueChanged(int index) {
@@ -1265,6 +1278,7 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
         final String[] OTHER_SETTING_KEYS = {
                 CameraSettings.KEY_RECORD_LOCATION,
                 CameraSettings.KEY_POWER_SHUTTER,
+                CameraSettings.KEY_VOLUME_ZOOM,
                 CameraSettings.KEY_PICTURE_SIZE,
                 CameraSettings.KEY_FOCUS_MODE};
 
@@ -1675,12 +1689,13 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
     // Preview area is touched. Handle touch focus.
     @Override
     public boolean onTouch(View v, MotionEvent e) {
+
         if (mPausing || mCameraDevice == null || !mFirstTimeInitialized
                 || mCameraState == SNAPSHOT_IN_PROGRESS) {
             return false;
         }
 
-        // Do not trigger touch focus or pinch zoom if popup window is opened.
+        // Do not trigger touch focus or Pinch zoom if popup window is opened.
         if (collapseCameraControls()) return false;
 
         // Check if metering area or focus area is supported.
@@ -1688,6 +1703,9 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
 
         // Do Pinch zoom
         if (e.getAction() > 1) {
+            // Remove any previous touch to focus requests
+            mHandler.removeMessages(START_TOUCH_TO_FOCUS);
+
             switch (e.getAction() & MotionEvent.ACTION_MASK) {
                 case MotionEvent.ACTION_POINTER_DOWN:
                    oldDistance = getDistance(e);
@@ -1698,27 +1716,28 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
                    mHandler.sendEmptyMessageDelayed(FINISH_PINCH_TO_ZOOM, 250);
                    break;
                 case MotionEvent.ACTION_MOVE:
-                    if (mStartZoom) {
-                        float newDistance = getDistance(e);
+                   if (mStartZoom) {
+                       float newDistance = getDistance(e);
 
-                        // Perform zoom only when preview is started and snapshot is not in
-                        // progress.
-                        if (mPausing || !isCameraIdle() || mCameraState == PREVIEW_STOPPED
+                       // Perform zoom only when preview is started and snapshot is not in
+                       // progress.
+                       if (mPausing || !isCameraIdle() || mCameraState == PREVIEW_STOPPED
                                     || mZoomState != ZOOM_STOPPED) {
-                            break;
-                        }
-                        if ( newDistance > oldDistance + 10 && mZoomValue < mZoomMax) {
-                            mZoomValue = mZoomValue + 1;
-                            setCameraParametersWhenIdle(UPDATE_PARAM_ZOOM);
-                            mZoomControl.setZoomIndex(mZoomValue);
-                            oldDistance = newDistance;
-                        }
-                        if ( newDistance < oldDistance -10 && mZoomValue > 0) {
-                            mZoomValue = mZoomValue - 1;
-                            setCameraParametersWhenIdle(UPDATE_PARAM_ZOOM);
-                            mZoomControl.setZoomIndex(mZoomValue);
-                            oldDistance = newDistance;
-                        }
+                           break;
+                       }
+                       if ( newDistance > oldDistance + 10 && mZoomValue < mZoomMax) {
+                           mZoomValue = mZoomValue + 1;
+                           setCameraParametersWhenIdle(UPDATE_PARAM_ZOOM);
+                           mZoomControl.setZoomIndex(mZoomValue);
+                           oldDistance = newDistance;
+                       }
+                       if ( newDistance < oldDistance -10 && mZoomValue > 0) {
+                           mZoomValue = mZoomValue - 1;
+                           setCameraParametersWhenIdle(UPDATE_PARAM_ZOOM);
+                           mZoomControl.setZoomIndex(mZoomValue);
+                           oldDistance = newDistance;
+                       }
+
                    }
                    break;
             }
@@ -1726,19 +1745,26 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
         }
 
         // Do not trigger a focus during a pinch-to-zoom operation
-        if (mStartZoom)
+        if (mStartZoom) {
             return false;
+        }
 
-        return mFocusManager.onTouch(e);
+        // Delay touch to focus for a few milliseconds in order to prevent mixups
+        // between pinch to zoom touch to focus handling
+        Message touchToFocusMessage = mHandler.obtainMessage(START_TOUCH_TO_FOCUS);
+        touchToFocusMessage.obj = MotionEvent.obtain(e);
+        mHandler.sendMessageDelayed(touchToFocusMessage, TOUCH_TO_FOCUS_START_DELAY);
+
+        return true;
     }
 
     // Determine the space between the two touch points
     private float getDistance(MotionEvent e) {
-        if (e.getPointerCount() < 2)
-            return 0;
-        float x = e.getX(0) - e.getX(1);
-        float y = e.getY(0) - e.getY(1);
-        return FloatMath.sqrt(x * x + y * y);
+       if (e.getPointerCount() < 2)
+           return 0;
+       float x = e.getX(0) - e.getX(1);
+       float y = e.getY(0) - e.getY(1);
+       return FloatMath.sqrt(x * x + y * y);
     }
 
     @Override
@@ -1788,6 +1814,33 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
                     onShutterButtonFocus(true);
                 }
                 return true;
+            case KeyEvent.KEYCODE_VOLUME_UP:
+                
+            	// If the Volume Up key is pressed, zoom in.
+            	if (mFirstTimeInitialized && event.getRepeatCount() == 0) {
+            		if (mParameters.isZoomSupported()) {
+            		    if (mVolumeZoom) {
+            		        mZoomValue = (((mZoomValue + 10) > mZoomMax) ? mZoomMax : (mZoomValue + 10)); 
+                		    onZoomValueChanged(mZoomValue);
+                		    mZoomControl.setZoomIndex(mZoomValue);
+                		    return true;
+            		    }
+            		}
+            	}
+            	return false;
+            case KeyEvent.KEYCODE_VOLUME_DOWN:
+            	// If the Volume Down key is pressed, zoom out.
+            	if (mFirstTimeInitialized && event.getRepeatCount() == 0) {
+            		if (mParameters.isZoomSupported()) {
+            		    if (mVolumeZoom) {
+            		        mZoomValue = (((mZoomValue - 10) < 0) ? 0 : (mZoomValue - 10)); 
+                            onZoomValueChanged(mZoomValue);
+                            mZoomControl.setZoomIndex(mZoomValue);
+                            return true;
+            		    }
+            		}
+            	}
+            	return false;
         }
 
         return super.onKeyDown(keyCode, event);
@@ -2295,6 +2348,9 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
         boolean recordLocation = RecordLocationPreference.get(
                 mPreferences, getContentResolver());
         mLocationManager.recordLocation(recordLocation);
+        
+        if (mParameters.isZoomSupported())
+            mVolumeZoom = VolumeZoomPreference.get(mPreferences, mContentResolver);
 
         int cameraId = CameraSettings.readPreferredCameraId(mPreferences);
         if (mCameraId != cameraId) {
