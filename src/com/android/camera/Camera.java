@@ -1851,7 +1851,7 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
                 }
                 return true;
             case KeyEvent.KEYCODE_VOLUME_DOWN:
-            case keyEvent.KEYCODE_VOLUME_UP:
+            case KeyEvent.KEYCODE_VOLUME_UP:
                 if (mFirstTimeInitialized && mVolumeZoom) {
                     return true;
                 }
