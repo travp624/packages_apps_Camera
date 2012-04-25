@@ -1850,6 +1850,11 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
                     onShutterButtonClick();
                 }
                 return true;
+            case KeyEvent.KEYCODE_VOLUME_DOWN:
+            case keyEvent.KEYCODE_VOLUME_UP:
+                if (mFirstTimeInitialized && mVolumeZoom) {
+                    return true;
+                }
         }
         return super.onKeyUp(keyCode, event);
     }
