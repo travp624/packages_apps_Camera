@@ -1815,7 +1815,6 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
                 }
                 return true;
             case KeyEvent.KEYCODE_VOLUME_UP:
-                
             	// If the Volume Up key is pressed, zoom in.
             	if (mFirstTimeInitialized && mVolumeZoom && (event.getRepeatCount() == 0)) {
                     mZoomValue = (((mZoomValue + 10) > mZoomMax) ? mZoomMax : (mZoomValue + 10)); 
