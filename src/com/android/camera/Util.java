@@ -99,6 +99,9 @@ public class Util {
     // Workaround for QC cameras with broken face detection on front camera
     private static boolean sNoFaceDetectOnFrontCamera;
 
+    // HTC camcorder mode
+    private static boolean sHTCCamMode;
+
     private Util() {
     }
 
@@ -119,10 +122,16 @@ public class Util {
         sSamsungCamSettings = context.getResources().getBoolean(R.bool.hasSamsungCamSettings);
         sEnableZSL = context.getResources().getBoolean(R.bool.enableZSL);
         sNoFaceDetectOnFrontCamera = context.getResources().getBoolean(R.bool.noFaceDetectOnFrontCamera);
+        sHTCCamMode = context.getResources().getBoolean(R.bool.needsHTCCamMode);
+
     }
 
     public static boolean needsEarlyVideoSize() {
         return sEarlyVideoSize;
+    }
+
+    public static boolean useHTCCamMode() {
+        return sHTCCamMode;
     }
 
     public static boolean useSamsungCamMode() {

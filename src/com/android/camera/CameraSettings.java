@@ -548,6 +548,9 @@ public class CameraSettings {
         if (mSamsungCamMode) {
             params.set("cam_mode", on ? "1" : "0");
         }
+        if (Util.useHTCCamMode()) {
+            params.set("cam-mode", on ? "1" : "0");
+        }
     }
 
     /**
